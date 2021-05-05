@@ -19,7 +19,7 @@ int inputmodel(vector<double> &probabilities)
 
 //--------------------------------------------------------------------//
 //Controls
-	bool setDesignsManually = true;
+	bool setDesignsManually = false;
 	vector<double> setDesign{7-1,6-1,2-1}; 
 
 	bool useBattery = false;
