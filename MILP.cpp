@@ -20,14 +20,14 @@ int inputmodel(vector<double> &probabilities)
 //--------------------------------------------------------------------//
 //Controls
 	bool setDesignsManually = false;
-	vector<double> setDesign{7-1,6-1,2-1}; 
+	vector<double> setDesign{3-1,8-1,5-1}; 
 
-	bool useBattery = false;
+	bool useBattery = true;
 
 	bool expectedValueProblem = false;
 
 	bool printFile =true;
-	string uncertiantyFolder = "Examples/GOSSIP_library/RES_master/Petter_files/UncertaintyData/";
+	string uncertiantyFolder = "ScenarioSet4/";
 
 
 //--------------------------------------------------------------------//		
@@ -49,29 +49,29 @@ int inputmodel(vector<double> &probabilities)
 	// Cost Parameters
 	double r = 0.06; 	//Interest rate 
 	vector<double> L{30,20,15}; //Lifetime
-	vector<double> C{130,2000000,150000}; //Linear cost per unit size $/{m²,no.,Mwh}
+	vector<double> C{130,1200000,180000}; //Linear cost per unit size $/{m²,no.,Mwh}
 	vector<double> xi{0.05,0.05,0.02};	//Maintenance factor 
 
-	double budget = 15*1000000; // M$
+	double budget = 20*1000000; // M$
 
 	//
 	//--------------------------------------------------------------------//
 	// Discretization params
 	vector<int> numDiscrete{10,10,10}; //number of discrete design values
-	vector<double> Z_UB {45000,9,45}; //Upper bounds {m²,no.,Mwh}
+	vector<double> Z_UB {72000,18,13.5}; //Upper bounds {m²,no.,Mwh}
 	vector<double>Z_LB{0,0,0}; // Lower bounds {m²,no.,Mwh}
 
 	//--------------------------------------------------------------------//
 	// Model Parameters: Grid
-	double FiT 			= 100;		// Renewabel Feed-in-tariff $/MWh
+	double FiT 			= 70;		// Renewabel Feed-in-tariff $/MWh
 	double FiT_extra	= 0.5*FiT;	// Earnings for feeding extra power into grid demand. 
 	//--------------------------------------------------------------------//
 	// Model Parameters: Renewable power gen
 	double eta_PV = 0.2; //Efficiency PV
 
 	double q_d 	= 1;	// MW Rated power for wind turbine
-	double W_d = 12;	//Rated wind velocity m/s
-	double W_min = 3.5; // Cut-in wind velocity m/s
+	double W_d = 14;	//Rated wind velocity m/s
+	double W_min = 4; // Cut-in wind velocity m/s
 	double W_max = 25; 	// Cut-off wind velocity m/s
 
 	//--------------------------------------------------------------------//
@@ -79,7 +79,7 @@ int inputmodel(vector<double> &probabilities)
 	double SoC_initial	= 50;			//50;	// Initial state of charge of battery %
 	double SoC_min 		= 10;			//10;	// min soc %
 	double SoC_max 		= 90;			//90;	// max soc %
-	double eta_ES_storage	= 0.99993;	//0.99993;		// Representing eergy storage self discharge losses												// Based on self-discharge loss of 5% per month
+	double eta_ES_storage	= 0.998;	//0.99993;		// Representing eergy storage self discharge losses												// Based on self-discharge loss of 5% per month
 	double eta_ES_ch		= 0.95;		//0.95;		// Energy storage charging losses
 	double eta_ES_dis		= 0.95;		//0.95;	// Energy storage efficiency losses per hour
 	double C_rate_max		= 0.25;		//0.25;
@@ -305,8 +305,8 @@ cout<<"-- Discretization performed.. --"<<endl;
 	vector<vector<Variables>>f_renewables(numTimesteps,
 			vector<Variables>(numScen)); // [MW]
 
-	vector<vector<Variables>>f_demand(numTimesteps,
-			vector<Variables>(numScen)); // [MW]
+	//vector<vector<Variables>>f_demand(numTimesteps,
+	//		vector<Variables>(numScen)); // [MW]
 
 	// PV
 	vector<vector<Variables>>f_PV(numTimesteps,
@@ -334,8 +334,8 @@ cout<<"-- Discretization performed.. --"<<endl;
 		{
 			sprintf(clabel,"f_renewables[%d][%d]",t+1,h+1);
 			f_renewables[t][h].setIndependentVariable(++varcount,compgraph::CONTINUOUS,I(0,(bound_WT+bound_PV)),0.,h+1,clabel);
-			sprintf(clabel,"f_demand[%d][%d]",t+1,h+1);
-			f_demand[t][h].setIndependentVariable(++varcount,compgraph::CONTINUOUS,I(0,bound_DEM),0.,h+1,clabel);
+			//sprintf(clabel,"f_demand[%d][%d]",t+1,h+1);
+			//f_demand[t][h].setIndependentVariable(++varcount,compgraph::CONTINUOUS,I(0,bound_DEM),0.,h+1,clabel);
 			sprintf(clabel,"f_PV[%d][%d]",t+1,h+1);
 			f_PV[t][h].setIndependentVariable(++varcount,compgraph::CONTINUOUS,I(0,bound_PV),0.,h+1,clabel);
 			sprintf(clabel,"f_WT[%d][%d]",t+1,h+1);
@@ -398,15 +398,15 @@ cout<<"-- 2nd stage varaiables declared.. --"<<endl;
 				continue;
 			}
 			cout<<" CRF+xi = "<< CRF[tech]+xi[tech]<<endl;
-			obj[h] += Z[tech][h]*C[tech]*(CRF[tech]+xi[tech]); // annual investemnt + maintenance
+			obj[h] += Z[tech][h]*C[tech]*CRF[tech]*(1+xi[tech]); // annual investemnt + maintenance
 		}
 		//Operating cost (earnings)
 		for (int t=0 ; t<numTimesteps ; t++)
 		{	
 
 			obj[h] += 365*uncertainParams["OC_GRID"][t][h]*f_grid_import[t][h]*deltaT;
-			obj[h] -= 365*f_grid_export[t][h]*FiT_extra*deltaT;
-			obj[h] -= 365*f_demand[t][h]*FiT*deltaT;			
+			obj[h] -= 365*(f_grid_export[t][h]-f_grid_import[t][h])*FiT_extra*deltaT;
+			obj[h] -= 365*(uncertainParams["L_DEM"][t][h]-f_grid_import[t][h])*FiT*deltaT;			
 			
 		}
 		obj[h].setDependentVariable(++concount,compgraph::OBJ,true,h+1);
@@ -526,7 +526,7 @@ cout<<"-- 1st stage constraints set.. --"<<endl;
 		{
 			con_energyhub_eb[t][h] = 0;
 			con_energyhub_eb[t][h] -= uncertainParams["L_DEM"][t][h];
-			//con_energyhub_eb[t][h] -= f_demand[t][h];
+			//con_energyhub_eb[t][h] -= f_demand[t][h];		
 			con_energyhub_eb[t][h] += f_renewables[t][h];
 			con_energyhub_eb[t][h] += f_grid_import[t][h];
 			// Eb2
@@ -540,12 +540,11 @@ cout<<"-- 1st stage constraints set.. --"<<endl;
 				con_renewables_eb[t][h] -= f_bat_charge[t][h];
 				con_renewables_eb[t][h] += f_bat_discharge[t][h];
 			}	
+		
+			// Demand flow; uncertain parameter; delete
+			// con_demand[t][h] = -f_demand[t][h];
+			// con_demand[t][h] += uncertainParams["L_DEM"][t][h];
 
-			con_demand[t][h] = -f_demand[t][h];
-			con_demand[t][h] += uncertainParams["L_DEM"][t][h];
-
-			
-			// Demand flow; uncertain parameter
 
 			//PV
 			con_PV[t][h] = -f_PV[t][h];
@@ -573,7 +572,8 @@ cout<<"-- 1st stage constraints set.. --"<<endl;
 			}
 			else
 			{
-				con_WT[t][h] += Z[1][h]*0;
+				//con_WT[t][h] += 0;  //WRONG
+				con_WT[t][h] += Z[1][h]*0;	//CORRECT
 			}
 			
 			if(!useBattery)
